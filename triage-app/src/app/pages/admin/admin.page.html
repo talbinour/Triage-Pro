@@ -1,0 +1,908 @@
+<ion-header class="admin-header">
+  <ion-toolbar>
+    <div class="toolbar-content">
+      <div class="header-left">
+        <div class="logo-icon-wrap"><ion-icon name="pulse-outline"></ion-icon></div>
+        <div>
+          <h2>TriagePro <span class="badge-admin">Admin</span></h2>
+          <p>{{ currentUser?.nom_complet }}</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-profil" (click)="goToProfil()">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </button>
+        <button class="btn-logout" (click)="logout()">
+          <ion-icon name="log-out-outline"></ion-icon> Déconnexion
+        </button>
+      </div>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-content">
+  <div class="admin-container" [class.panel-open]="alertePanelOpen">
+
+    <!-- ══ ONGLETS PRINCIPAUX ══ -->
+   <div class="tabs">
+      <button [class.active]="activeTab === 'comptes'" (click)="onTabChange('comptes')">
+        <ion-icon name="people-outline"></ion-icon>
+        Comptes
+      </button>
+      <button [class.active]="activeTab === 'dashboard'" (click)="onTabChange('dashboard')">
+        <ion-icon name="grid-outline"></ion-icon>
+        Dashboard
+      </button>
+      <button [class.active]="activeTab === 'ressources'" (click)="onTabChange('ressources')">
+        <ion-icon name="server-outline"></ion-icon>
+        Ressources
+        <span class="alert-dot" *ngIf="dashData && dashData.alertes.length > 0"></span>
+      </button>
+      <button [class.active]="activeTab === 'remarques'" (click)="onTabChange('remarques')">
+        <ion-icon name="chatbubbles-outline"></ion-icon>
+        Remarques
+        <span class="alert-dot" *ngIf="hasRemarquesNonRepondues"></span>      </button>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         ONGLET 1 — COMPTES
+    ══════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'comptes'" class="tab-content">
+
+      <!-- Stats -->
+      <div class="stats-grid" *ngIf="stats">
+        <div class="stat-card stat-total">
+          <ion-icon name="people-outline"></ion-icon>
+          <div><span class="stat-value">{{ stats.total }}</span><span class="stat-label">Total</span></div>
+        </div>
+        <div class="stat-card stat-actif">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          <div><span class="stat-value">{{ stats.actifs }}</span><span class="stat-label">Actifs</span></div>
+        </div>
+        <div class="stat-card stat-inactif">
+          <ion-icon name="pause-circle-outline"></ion-icon>
+          <div><span class="stat-value">{{ stats.inactifs }}</span><span class="stat-label">Inactifs</span></div>
+        </div>
+        <div class="stat-card stat-suspendu">
+          <ion-icon name="ban-outline"></ion-icon>
+          <div><span class="stat-value">{{ stats.suspendus }}</span><span class="stat-label">Suspendus</span></div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions-bar">
+        <div class="search-box">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="onSearch()" placeholder="Rechercher..."/>
+          <ion-icon name="close-outline" *ngIf="searchTerm" (click)="clearSearch()" class="clear-icon"></ion-icon>
+        </div>
+        <div class="filters">
+          <select [(ngModel)]="filtreRole" (ngModelChange)="applyFiltres()">
+            <option value="">Tous les rôles</option>
+            <option value="infirmier">Infirmiers</option>
+            <option value="admin">Admins</option>
+          </select>
+          <select [(ngModel)]="filtreStatut" (ngModelChange)="applyFiltres()">
+            <option value="">Tous les statuts</option>
+            <option value="actif">Actifs</option>
+            <option value="inactif">Inactifs</option>
+            <option value="suspendu">Suspendus</option>
+          </select>
+        </div>
+        <button class="btn-primary" (click)="openCreateModal()">
+          <ion-icon name="person-add-outline"></ion-icon> Nouveau compte
+        </button>
+      </div>
+
+      <!-- Tableau -->
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Comptes infirmiers</h3>
+          <span class="count-badge">{{ infirmiers.length }} résultat(s)</span>
+        </div>
+        <div class="loading-state" *ngIf="loading">
+          <ion-spinner name="crescent"></ion-spinner><span>Chargement...</span>
+        </div>
+        <div class="empty-state" *ngIf="!loading && infirmiers.length === 0">
+          <ion-icon name="people-outline"></ion-icon><p>Aucun compte trouvé</p>
+        </div>
+        <div class="table-scroll" *ngIf="!loading && infirmiers.length > 0">
+          <table>
+            <thead>
+              <tr><th>Infirmier</th><th>Email</th><th>Service</th><th>Rôle</th><th>Statut</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let inf of infirmiers">
+                <td>
+                  <div class="user-cell">
+                    <div class="avatar" [style.background]="getAvatarColor(inf.nom)">
+                      {{ inf.prenom?.charAt(0) }}{{ inf.nom?.charAt(0) }}
+                    </div>
+                    <span>{{ inf.nom_complet }}</span>
+                  </div>
+                </td>
+                <td class="email-cell">{{ inf.email }}</td>
+                <td>{{ inf.service || '—' }}</td>
+                <td><span class="badge-role" [class.is-admin]="inf.role === 'admin'">{{ inf.role === 'admin' ? 'Admin' : 'Infirmier' }}</span></td>
+                <td><span class="badge-statut" [class]="'statut-' + inf.statut">{{ inf.statut | titlecase }}</span></td>
+                <td>
+                  <div class="actions-cell">
+                    <button class="btn-icon btn-print" title="Imprimer badge" (click)="imprimerBadge(inf)">
+                      <ion-icon name="print-outline"></ion-icon>
+                    </button>
+                    <button class="btn-icon" title="Modifier" (click)="openEditModal(inf)">
+                      <ion-icon name="create-outline"></ion-icon>
+                    </button>
+                    <button class="btn-icon btn-key" (click)="openResetMdp(inf)"><ion-icon name="key-outline"></ion-icon></button>
+                    <button class="btn-icon btn-toggle" (click)="toggleStatut(inf)" [disabled]="inf.id === currentUser?.id">
+                      <ion-icon [name]="inf.statut === 'actif' ? 'pause-circle-outline' : 'play-circle-outline'"></ion-icon>
+                    </button>
+                    <button class="btn-icon btn-delete" (click)="confirmDelete(inf)" [disabled]="inf.id === currentUser?.id">
+                      <ion-icon name="trash-outline"></ion-icon>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         ONGLET 2 — DASHBOARD
+    ══════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'dashboard'" class="tab-content">
+
+      <div class="loading-state" *ngIf="dashLoading">
+        <ion-spinner name="crescent"></ion-spinner><p>Chargement...</p>
+      </div>
+
+      <ng-container *ngIf="!dashLoading && dashData">
+
+        <!-- Compteurs -->
+        <div class="cards-grid">
+          <div class="dash-card card-patients">
+            <div class="card-icon"><ion-icon name="hourglass-outline"></ion-icon></div>
+            <div class="card-info">
+              <span class="card-value">{{ dashData.patients.total_attente }}</span>
+              <span class="card-label">En attente</span>
+            </div>
+          </div>
+          <div class="dash-card card-consult">
+            <div class="card-icon"><ion-icon name="medkit-outline"></ion-icon></div>
+            <div class="card-info">
+              <span class="card-value">{{ dashData.patients.en_consultation }}</span>
+              <span class="card-label">En consultation</span>
+            </div>
+          </div>
+          <div class="dash-card card-done">
+            <div class="card-icon"><ion-icon name="checkmark-done-outline"></ion-icon></div>
+            <div class="card-info">
+              <span class="card-value">{{ dashData.patients.termines_aujourdhui }}</span>
+              <span class="card-label">Terminés aujourd'hui</span>
+            </div>
+          </div>
+          <div class="dash-card card-staff">
+            <div class="card-icon"><ion-icon name="person-outline"></ion-icon></div>
+            <div class="card-info">
+              <span class="card-value">{{ dashData.personnel.en_service }}</span>
+              <span class="card-label">En service</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Distribution P1-P5 -->
+        <div class="widget-card">
+          <h4 class="widget-title">
+            <ion-icon name="bar-chart-outline"></ion-icon>
+            Distribution par niveau d'urgence
+          </h4>
+          <div class="urgence-bars">
+            <div class="urgence-row" *ngFor="let k of niveauxKeys()">
+              <span class="urgence-key" [style.color]="couleurUrgence(k)">{{ k }}</span>
+              <div class="urgence-track">
+                <div class="urgence-fill"
+                  [style.width]="dashData.patients.total_attente > 0
+                    ? ((dashData.patients.par_niveau[k] || 0) / dashData.patients.total_attente * 100) + '%'
+                    : '0%'"
+                  [style.background]="couleurUrgence(k)">
+                </div>
+              </div>
+              <span class="urgence-count">{{ dashData.patients.par_niveau[k] || 0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Résumé lits -->
+        <div class="widget-card">
+          <h4 class="widget-title">
+            <ion-icon name="bed-outline"></ion-icon>
+            État des lits
+          </h4>
+          <div class="lits-resume">
+            <div class="lit-resume-card" *ngFor="let l of dashData.lits">
+              <div class="lit-type-label">{{ l.type | titlecase }}</div>
+              <div class="lit-gauge">
+                <div class="gauge-fill"
+                  [style.width]="pourcentage(l.libres, l.total) + '%'"
+                  [style.background]="l.libres <= 2 ? '#c0392b' : l.libres <= 4 ? '#e67e22' : '#27ae60'">
+                </div>
+              </div>
+              <div class="lit-counts">
+                <span class="lit-libre">{{ l.libres }} libres</span>
+                <span class="lit-total">/ {{ l.total }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- ══ Taux de correction IA ══ -->
+        <div class="widget-card" *ngIf="statsAvancees">
+          <h4 class="widget-title">
+            <ion-icon name="analytics-outline"></ion-icon>
+            Performance du modèle IA
+          </h4>
+          <div class="ia-perf-row">
+            <div class="ia-perf-card">
+              <div class="ia-perf-ring">
+                <svg viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="#eef2f3" stroke-width="3"/>
+                  <circle cx="18" cy="18" r="15.5" fill="none"
+                    [attr.stroke]="statsAvancees.taux_correction < 10 ? '#27ae60' : statsAvancees.taux_correction < 25 ? '#e67e22' : '#c0392b'"
+                    stroke-width="3" stroke-linecap="round"
+                    [attr.stroke-dasharray]="97.4"
+                    [attr.stroke-dashoffset]="97.4 - (97.4 * (100 - statsAvancees.taux_correction) / 100)"
+                    transform="rotate(-90 18 18)"/>
+                </svg>
+                <span class="ia-perf-value">{{ 100 - statsAvancees.taux_correction }}%</span>
+              </div>
+              <div>
+                <span class="ia-perf-label">Précision IA</span>
+                <span class="ia-perf-sub">{{ statsAvancees.total_avec_urgence }} évaluations</span>
+              </div>
+            </div>
+            <div class="ia-perf-card">
+              <div class="ia-perf-big">{{ statsAvancees.taux_correction }}%</div>
+              <div>
+                <span class="ia-perf-label">Corrections manuelles</span>
+                <span class="ia-perf-sub">{{ statsAvancees.total_corriges }} sur {{ statsAvancees.total_avec_urgence }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ Temps d'attente moyen par niveau ══ -->
+        <div class="widget-card" *ngIf="statsAvancees">
+          <h4 class="widget-title">
+            <ion-icon name="timer-outline"></ion-icon>
+            Temps d'attente moyen par niveau
+          </h4>
+          <div class="attente-grid">
+            <div class="attente-item" *ngFor="let k of tempsAttenteNiveaux()">
+              <div class="attente-niveau" [style.background]="couleurUrgence(k)">{{ k }}</div>
+              <div class="attente-info">
+                <span class="attente-temps">{{ getTempsAttente(k) }}</span>
+                <span class="attente-count">{{ getTempsAttenteCount(k) }} patients</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- ══ Export PDF mensuel ══ -->
+        <div class="widget-card">
+          <div class="widget-header-row">
+            <h4 class="widget-title" style="margin:0">
+              <ion-icon name="document-text-outline"></ion-icon>
+              Rapport mensuel
+            </h4>
+            <button class="btn-export" (click)="openExportModal()">
+              <ion-icon name="download-outline"></ion-icon> Exporter PDF
+            </button>
+          </div>
+          <p class="widget-desc">Sélectionnez un mois pour générer un rapport PDF complet incluant les statistiques, la courbe d'affluence et la liste des triages.</p>
+        </div>
+
+        <!-- ══ Courbe d'affluence 24h ══ -->
+        <div class="widget-card" *ngIf="statsAvancees">
+          <h4 class="widget-title">
+            <ion-icon name="trending-up-outline"></ion-icon>
+            Affluence des dernières 24 heures
+          </h4>
+          <div class="affluence-chart">
+            <div class="affluence-bar-wrap" *ngFor="let a of statsAvancees.affluence_24h">
+              <div class="affluence-bar"
+                [style.height]="barHeight(a.count)"
+                [style.background]="a.count > getMaxAffluence() * 0.7 ? '#e67e22' : '#088395'">
+              </div>
+              <span class="affluence-count" *ngIf="a.count > 0">{{ a.count }}</span>
+              <span class="affluence-heure">{{ a.heure }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ Historique des triages ══ -->
+        <div class="widget-card">
+          <div class="historique-header">
+            <h4 class="widget-title" style="margin:0">
+              <ion-icon name="time-outline"></ion-icon>
+              Historique des triages
+            </h4>
+            <div class="historique-nav">
+              <button class="btn-nav-jour" (click)="historiqueJourPrecedent()">
+                <ion-icon name="chevron-back-outline"></ion-icon>
+              </button>
+              <button class="btn-jour-label" (click)="historiqueAujourdhui()">
+                {{ historiqueDateLabel }}
+              </button>
+              <button class="btn-nav-jour" (click)="historiqueJourSuivant()" [disabled]="isHistoriqueToday()">
+                <ion-icon name="chevron-forward-outline"></ion-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="loading-state" *ngIf="historiqueLoading">
+            <ion-spinner name="crescent"></ion-spinner>
+          </div>
+
+          <div class="empty-state" *ngIf="!historiqueLoading && historique.length === 0" style="padding:30px">
+            <ion-icon name="document-outline"></ion-icon>
+            <p>Aucun triage pour cette journée</p>
+          </div>
+
+          <div class="historique-table" *ngIf="!historiqueLoading && historique.length > 0">
+            <div class="historique-count">{{ historique.length }} patient(s)</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Niveau</th>
+                  <th>Infirmier</th>
+                  <th>Lit</th>
+                  <th>Heure</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let p of historique">
+                  <td>
+                    <div class="hist-patient">
+                      <strong>{{ p.prenom }} {{ p.nom }}</strong>
+                      <span>{{ p.age }} ans · {{ p.sexe === 'M' ? 'M' : 'F' }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="hist-niveau" [style.background]="couleurUrgence('P' + p.degre_urgence)">
+                      P{{ p.degre_urgence }}
+                    </span>
+                  </td>
+                  <td class="hist-infirmier">{{ p.infirmier_nom }}</td>
+                  <td>{{ p.lit_numero || '—' }}</td>
+                  <td class="hist-date">{{ p.date_creation | date:'HH:mm' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         ONGLET 3 — RESSOURCES
+    ══════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'ressources'" class="tab-content">
+
+      <!-- Sous-onglets ressources -->
+      <div class="sub-tabs">
+        <button [class.active]="activeRessource === 'lits'" (click)="onRessourceChange('lits')">
+          <ion-icon name="bed-outline"></ion-icon> Lits
+        </button>
+        <button [class.active]="activeRessource === 'equipements'" (click)="onRessourceChange('equipements')">
+          <ion-icon name="hardware-chip-outline"></ion-icon> Équipements
+        </button>
+        <button [class.active]="activeRessource === 'personnel'" (click)="onRessourceChange('personnel')">
+          <ion-icon name="people-outline"></ion-icon> Personnel
+        </button>
+      </div>
+
+      <!-- ── Lits ── -->
+      <div *ngIf="activeRessource === 'lits'">
+        <div class="section-header">
+          <h3>Gestion des lits</h3>
+          <button class="btn-primary" (click)="openLitModal()">
+            <ion-icon name="add-outline"></ion-icon> Ajouter
+          </button>
+        </div>
+        <div class="loading-state" *ngIf="litsLoading"><ion-spinner name="crescent"></ion-spinner></div>
+        <div class="lits-grid" *ngIf="!litsLoading">
+          <div class="lit-card" *ngFor="let lit of litsDetails" [class.occupe]="lit.statut === 'occupe'">
+            <div class="lit-numero">{{ lit.numero }}</div>
+            <div class="lit-type-tag">{{ lit.type }}</div>
+            <div class="lit-statut">
+              <span class="statut-dot" [style.background]="lit.statut === 'libre' ? '#27ae60' : '#c0392b'"></span>
+              {{ lit.statut === 'libre' ? 'Libre' : 'Occupé' }}
+            </div>
+            <div class="lit-patient" *ngIf="lit.patient_nom">
+              <ion-icon name="person-outline"></ion-icon> {{ lit.patient_nom }}
+            </div>
+            <button class="btn-delete-lit" (click)="supprimerLit(lit)" *ngIf="lit.statut === 'libre'">
+              <ion-icon name="trash-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Équipements ── -->
+      <div *ngIf="activeRessource === 'equipements'">
+        <div class="section-header">
+          <h3>Équipements médicaux</h3>
+          <button class="btn-primary" (click)="openEquipModal()">
+            <ion-icon name="add-outline"></ion-icon> Ajouter
+          </button>
+        </div>
+        <div class="equip-list" *ngIf="dashData">
+          <div class="equip-card" *ngFor="let eq of dashData.equipements" [class.alerte]="eq.disponible <= eq.seuil_alerte">
+            <div class="equip-header">
+              <h4>{{ eq.nom }}</h4>
+              <span class="equip-badge"
+                [style.background]="eq.disponible === 0 ? '#c0392b' : eq.disponible <= eq.seuil_alerte ? '#e67e22' : '#27ae60'">
+                {{ eq.disponible }}/{{ eq.total }}
+              </span>
+            </div>
+            <div class="equip-gauge">
+              <div class="gauge-fill"
+                [style.width]="pourcentage(eq.disponible, eq.total) + '%'"
+                [style.background]="eq.disponible === 0 ? '#c0392b' : eq.disponible <= eq.seuil_alerte ? '#e67e22' : '#27ae60'">
+              </div>
+            </div>
+            <div class="equip-footer">
+              <span>Seuil : {{ eq.seuil_alerte }} {{ eq.unite }}</span>
+              <div class="equip-actions">
+                <button class="btn-icon" (click)="openEquipModal(eq)"><ion-icon name="create-outline"></ion-icon></button>
+                <button class="btn-icon btn-delete" (click)="supprimerEquipement(eq)"><ion-icon name="trash-outline"></ion-icon></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Personnel / Planning ── -->
+      <div *ngIf="activeRessource === 'personnel'">
+        <div class="section-header">
+          <h3>Planning du service</h3>
+          <div class="planning-info-box">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <p>
+            Un infirmier affecté à la garde de nuit doit observer une journée de repos le lendemain.
+            Les créneaux sont : <strong>Matin (7h-13h)</strong>, <strong>Après-midi (13h-19h)</strong>, <strong>Nuit (19h-7h)</strong>.
+          </p>
+        </div>
+          <div class="planning-nav">
+            <button class="btn-nav-semaine" (click)="semainePrecedente()">
+              <ion-icon name="chevron-back-outline"></ion-icon>
+            </button>
+            <button class="btn-semaine-label" (click)="semaineActuelle()">
+              {{ getSemaineLabel() }}
+            </button>
+            <button class="btn-nav-semaine" (click)="semaineSuivante()">
+              <ion-icon name="chevron-forward-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="loading-state" *ngIf="planningLoading"><ion-spinner name="crescent"></ion-spinner></div>
+
+        <div class="planning-table-wrap" *ngIf="!planningLoading">
+          <table class="planning-table">
+            <thead>
+              <tr>
+                <th class="planning-th-name">Infirmier</th>
+                <th *ngFor="let d of semaineDates"
+                  class="planning-th-day"
+                  [class.today]="isToday(d.date)">
+                  <span class="day-name">{{ d.jour }}</span>
+                  <span class="day-date">{{ d.label }}</span>
+                  <span class="day-count">{{ countPlanningJour(d.date) }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let inf of planningInfirmiers">
+                <td class="planning-name-cell">
+                  <div class="planning-user">
+                    <div class="planning-avatar" [style.background]="getAvatarColor(inf.nom)">
+                      {{ inf.prenom?.charAt(0) }}{{ inf.nom?.charAt(0) }}
+                    </div>
+                    <div>
+                      <span class="planning-user-name">{{ inf.nom_complet }}</span>
+                      <span class="planning-user-service">{{ inf.service || '—' }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td *ngFor="let d of semaineDates"
+                  class="planning-day-cell"
+                  [class.today]="isToday(d.date)">
+
+                  <!-- Matin 7h-13h -->
+                  <div class="creneau-cell"
+                    [class.active]="isPlanned(inf.id, d.date, 'matin')"
+                    (click)="togglePlanningCell(inf.id, d.date, 'matin')"
+                    title="Matin 7h-13h">
+                    <ion-icon [name]="isPlanned(inf.id, d.date, 'matin') ? 'sunny' : 'sunny-outline'"></ion-icon>
+                    <span>M</span>
+                  </div>
+
+                  <!-- Après-midi 13h-19h -->
+                  <div class="creneau-cell creneau-aprem"
+                    [class.active]="isPlanned(inf.id, d.date, 'aprem')"
+                    (click)="togglePlanningCell(inf.id, d.date, 'aprem')"
+                    title="Après-midi 13h-19h">
+                    <ion-icon [name]="isPlanned(inf.id, d.date, 'aprem') ? 'partly-sunny' : 'partly-sunny-outline'"></ion-icon>
+                    <span>AM</span>
+                  </div>
+
+                  <!-- Nuit 19h-7h -->
+                  <div class="creneau-cell creneau-nuit"
+                    [class.active]="isPlanned(inf.id, d.date, 'nuit')"
+                    (click)="togglePlanningCell(inf.id, d.date, 'nuit')"
+                    title="Nuit 19h-7h">
+                    <ion-icon [name]="isPlanned(inf.id, d.date, 'nuit') ? 'moon' : 'moon-outline'"></ion-icon>
+                    <span>N</span>
+                  </div>
+
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+   <!-- ══════════════════════════════════════
+         ONGLET 4 — REMARQUES
+    ══════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'remarques'" class="tab-content">
+
+      <div class="loading-state" *ngIf="remarquesLoading"><ion-spinner name="crescent"></ion-spinner></div>
+
+      <ng-container *ngIf="!remarquesLoading">
+
+        <!-- ── Non traitées ── -->
+        <div class="section-header">
+          <h3>À traiter</h3>
+          <span class="count-badge" *ngIf="remarquesNonTraitees.length > 0">
+            {{ remarquesNonTraitees.length }} en attente
+          </span>
+        </div>
+
+        <div class="empty-state" *ngIf="remarquesNonTraitees.length === 0" style="padding:30px">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          <p>Aucune remarque à traiter</p>
+        </div>
+
+        <div class="remarques-admin-list" *ngIf="remarquesNonTraitees.length > 0">
+          <div class="remarque-admin-card non-repondu" *ngFor="let r of remarquesNonTraitees">
+            <div class="remarque-admin-top">
+              <div class="remarque-admin-user">
+                <div class="remarque-avatar" style="background:#e67e22">
+                  {{ r.infirmier_nom?.charAt(0) }}
+                </div>
+                <div>
+                  <strong>{{ r.infirmier_nom }}</strong>
+                  <span class="remarque-admin-date">{{ r.date_creation | date:'dd/MM/yyyy HH:mm' }}</span>
+                </div>
+              </div>
+              <span class="remarque-type-badge"
+                [class.reclamation]="r.type === 'reclamation'">
+                {{ r.type === 'reclamation' ? 'Réclamation' : 'Remarque' }}
+              </span>
+            </div>
+            <p class="remarque-admin-sujet" *ngIf="r.sujet">{{ r.sujet }}</p>
+            <p class="remarque-admin-message">{{ r.message }}</p>
+            <div class="remarque-admin-actions">
+              <button class="btn-traite" (click)="marquerRemarqueLue(r)">
+                <ion-icon name="checkmark-done-outline"></ion-icon> Marquer comme traité
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Historique traité ── -->
+        <div class="section-header" style="margin-top: 28px">
+          <h3>Historique</h3>
+          <span class="count-badge" *ngIf="remarquesTraitees.length > 0">
+            {{ remarquesTraitees.length }} traité(s)
+          </span>
+        </div>
+
+        <div class="empty-state" *ngIf="remarquesTraitees.length === 0" style="padding:20px">
+          <p>Aucune remarque traitée</p>
+        </div>
+
+        <div class="remarques-admin-list" *ngIf="remarquesTraitees.length > 0">
+          <div class="remarque-admin-card repondu" *ngFor="let r of remarquesTraitees">
+            <div class="remarque-admin-top">
+              <div class="remarque-admin-user">
+                <div class="remarque-avatar" style="background:#27ae60">
+                  {{ r.infirmier_nom?.charAt(0) }}
+                </div>
+                <div>
+                  <strong>{{ r.infirmier_nom }}</strong>
+                  <span class="remarque-admin-date">{{ r.date_creation | date:'dd/MM/yyyy HH:mm' }}</span>
+                </div>
+              </div>
+              <span class="remarque-statut-badge traite">
+                <ion-icon name="checkmark-circle-outline"></ion-icon> Traité
+              </span>
+            </div>
+            <p class="remarque-admin-sujet" *ngIf="r.sujet">{{ r.sujet }}</p>
+            <p class="remarque-admin-message">{{ r.message }}</p>
+          </div>
+        </div>
+
+      </ng-container>
+    </div>
+
+  </div>
+
+  <!-- ══ MODALS existantes (comptes) ══ -->
+  <!-- Modal Créer / Modifier -->
+  <div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingUser ? 'Modifier le compte' : 'Nouveau compte' }}</h3>
+        <button class="btn-close" (click)="closeModal()"><ion-icon name="close-outline"></ion-icon></button>
+      </div>
+      <form [formGroup]="userForm" (ngSubmit)="saveUser()" class="modal-form">
+        <div class="form-row">
+          <div class="field-group"><label>Prénom *</label><input type="text" formControlName="prenom"/></div>
+          <div class="field-group"><label>Nom *</label><input type="text" formControlName="nom"/></div>
+        </div>
+        <div class="field-group"><label>Email *</label><input type="email" formControlName="email"/></div>
+        <div class="field-group" *ngIf="!editingUser"><label>Mot de passe *</label><input type="password" formControlName="password"/></div>
+        <div class="form-row">
+          <div class="field-group">
+            <label>Rôle *</label>
+            <select formControlName="role"><option value="infirmier">Infirmier</option><option value="admin">Administrateur</option></select>
+          </div>
+          <div class="field-group"><label>Service</label><input type="text" formControlName="service"/></div>
+        </div>
+        <div class="field-group"><label>Téléphone</label><input type="tel" formControlName="telephone"/></div>
+        <div class="server-error" *ngIf="modalError"><ion-icon name="warning-outline"></ion-icon> {{ modalError }}</div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" (click)="closeModal()">Annuler</button>
+          <button type="submit" class="btn-primary" [disabled]="modalLoading">
+            <ion-spinner *ngIf="modalLoading" name="crescent"></ion-spinner>
+            <span *ngIf="!modalLoading">{{ editingUser ? 'Enregistrer' : 'Créer' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Reset MDP -->
+  <div class="modal-overlay" *ngIf="showResetModal" (click)="closeResetModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Réinitialiser le mot de passe</h3>
+        <button class="btn-close" (click)="closeResetModal()"><ion-icon name="close-outline"></ion-icon></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Nouveau mot de passe pour <strong>{{ resetTargetUser?.nom_complet }}</strong></p>
+        <input type="password" [(ngModel)]="newPassword" placeholder="Min. 8 caractères" class="reset-input"/>
+        <div class="server-error" *ngIf="modalError"><ion-icon name="warning-outline"></ion-icon> {{ modalError }}</div>
+        <div class="modal-actions">
+          <button class="btn-cancel" (click)="closeResetModal()">Annuler</button>
+          <button class="btn-primary" (click)="saveResetMdp()" [disabled]="modalLoading">
+            <ion-spinner *ngIf="modalLoading" name="crescent"></ion-spinner>
+            <span *ngIf="!modalLoading">Réinitialiser</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal QR Code -->
+  <div class="modal-overlay" *ngIf="showQrModal" (click)="closeQrModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>✅ Compte créé avec succès</h3>
+        <button class="btn-close" (click)="closeQrModal()"><ion-icon name="close-outline"></ion-icon></button>
+      </div>
+      <div class="modal-body qr-modal-body">
+        <p class="qr-modal-desc">Email envoyé à <strong>{{ newlyCreatedUser?.email }}</strong></p>
+        <div class="qr-preview-wrap">
+          <img *ngIf="newlyCreatedQr" [src]="'data:image/png;base64,' + newlyCreatedQr" width="180" height="180"/>
+          <p class="qr-label">QR Code de connexion</p>
+        </div>
+        <button class="btn-primary" style="width:100%;justify-content:center;margin-bottom:8px;background:linear-gradient(135deg,#8e44ad,#9b59b6);" 
+          (click)="imprimerBadge(newlyCreatedUser)">
+          <ion-icon name="print-outline"></ion-icon> Imprimer le badge
+        </button>
+        <button class="btn-primary" style="width:100%;justify-content:center;" (click)="closeQrModal()">
+          <ion-icon name="checkmark-outline"></ion-icon> Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ══════════════════════════════════════════
+       PANNEAU ALERTES LATÉRAL + BULLE FLOTTANTE
+  ══════════════════════════════════════════ -->
+
+  <!-- Bulle flottante (visible quand panneau fermé) -->
+  <div class="alerte-bubble"
+    *ngIf="dashData"
+    [class.sev-critique]="alerteMaxSeverite === 'critique'"
+    [class.sev-avertissement]="alerteMaxSeverite === 'avertissement'"
+    [class.sev-info]="alerteMaxSeverite === 'info'"
+    [class.sev-none]="alerteMaxSeverite === 'none'"
+    [class.pulse]="alerteCount > 0 && !alertePanelOpen"
+    [class.shifted]="alertePanelOpen"
+    (click)="toggleAlertePanel()">
+    <ion-icon [name]="alertePanelOpen ? 'chevron-back-outline' : (alerteCount > 0 ? 'notifications' : 'notifications-outline')"></ion-icon>
+    <span class="bubble-count" *ngIf="alerteCount > 0 && !alertePanelOpen">{{ alerteCount }}</span>
+  </div>
+
+
+  <!-- Panneau latéral -->
+  <div class="alerte-panel"
+    *ngIf="alertePanelOpen && dashData"
+    [class.sev-critique]="alerteMaxSeverite === 'critique'"
+    [class.sev-avertissement]="alerteMaxSeverite === 'avertissement'"
+    [class.sev-info]="alerteMaxSeverite === 'info'"
+    [class.sev-none]="alerteMaxSeverite === 'none'">
+
+    <!-- Header du panneau -->
+    <div class="panel-header">
+      <div class="panel-title">
+        <ion-icon name="notifications-outline"></ion-icon>
+        <span>Alertes</span>
+        <span class="panel-count" *ngIf="alerteCount > 0">{{ alerteCount }}</span>
+      </div>
+      <button class="panel-close" (click)="fermerAlertePanel()">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+
+    <!-- Contenu -->
+    <div class="panel-body">
+
+      <!-- Aucune alerte -->
+      <div class="panel-empty" *ngIf="alerteCount === 0">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <p>Tout est sous contrôle</p>
+        <span>Aucune alerte active</span>
+      </div>
+
+      <!-- Groupes d'alertes -->
+      <div class="alerte-groupe" *ngFor="let groupe of getAlertesGroupees()">
+
+        <!-- Header du groupe -->
+        <div class="groupe-header"
+          [class.sev-critique]="maxSeveriteGroupe(groupe.alertes) === 'critique'"
+          [class.sev-avertissement]="maxSeveriteGroupe(groupe.alertes) === 'avertissement'"
+          [class.sev-info]="maxSeveriteGroupe(groupe.alertes) === 'info'">
+          <div class="groupe-left">
+            <ion-icon [name]="groupe.icon"></ion-icon>
+            <span class="groupe-label">{{ groupe.label }}</span>
+          </div>
+          <span class="groupe-count"
+            [style.background]="couleurSeverite(maxSeveriteGroupe(groupe.alertes))">
+            {{ groupe.alertes.length }}
+          </span>
+        </div>
+
+        <!-- Alertes du groupe -->
+        <div class="groupe-alertes">
+          <div class="alerte-item-v2" *ngFor="let a of groupe.alertes"
+            [class.expanded]="alerteExpandedId === groupe.type + a._index"
+            (click)="toggleAlerteDetail(groupe.type + a._index)">
+
+            <!-- Indicateur de sévérité -->
+            <div class="alerte-sev-dot"
+              [style.background]="couleurSeverite(a.severite)">
+            </div>
+
+            <!-- Titre -->
+            <div class="alerte-content-v2">
+              <div class="alerte-title-row">
+                <span class="alerte-title-v2">{{ a.message }}</span>
+                <ion-icon class="alerte-chevron"
+                  [name]="alerteExpandedId === groupe.type + a._index ? 'chevron-up-outline' : 'chevron-down-outline'">
+                </ion-icon>
+              </div>
+
+              <!-- Détails (visible après clic) -->
+              <div class="alerte-details-v2"
+                *ngIf="alerteExpandedId === groupe.type + a._index">
+                <p>{{ a.details }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- ══ MODALS ══ -->
+  <!-- Modal Équipement -->
+  <div class="modal-overlay" *ngIf="showEquipModal" (click)="showEquipModal = false">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingEquip ? 'Modifier' : 'Nouvel équipement' }}</h3>
+        <button class="btn-close" (click)="showEquipModal = false"><ion-icon name="close-outline"></ion-icon></button>
+      </div>
+      <div class="modal-form">
+        <div class="field-group"><label>Nom *</label><input type="text" [(ngModel)]="equipForm.nom"/></div>
+        <div class="form-row">
+          <div class="field-group"><label>Total</label><input type="number" [(ngModel)]="equipForm.total"/></div>
+          <div class="field-group"><label>Disponible</label><input type="number" [(ngModel)]="equipForm.disponible"/></div>
+        </div>
+        <div class="form-row">
+          <div class="field-group"><label>Seuil d'alerte</label><input type="number" [(ngModel)]="equipForm.seuil_alerte"/></div>
+          <div class="field-group"><label>Unité</label><input type="text" [(ngModel)]="equipForm.unite"/></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" (click)="showEquipModal = false">Annuler</button>
+          <button class="btn-primary" (click)="saveEquipement()" [disabled]="equipModalLoading">
+            <ion-spinner *ngIf="equipModalLoading" name="crescent"></ion-spinner>
+            <span *ngIf="!equipModalLoading">{{ editingEquip ? 'Enregistrer' : 'Ajouter' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Lit -->
+  <div class="modal-overlay" *ngIf="showLitModal" (click)="showLitModal = false">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Ajouter un lit</h3>
+        <button class="btn-close" (click)="showLitModal = false"><ion-icon name="close-outline"></ion-icon></button>
+      </div>
+      <div class="modal-form">
+        <div class="field-group"><label>Numéro *</label><input type="text" [(ngModel)]="litForm.numero" placeholder="Ex: U-11"/></div>
+        <div class="form-row">
+          <div class="field-group">
+            <label>Type *</label>
+            <select [(ngModel)]="litForm.type" (ngModelChange)="onLitTypeChange()">
+              <option value="reanimation">Réanimation</option>
+              <option value="urgence">Urgence</option>
+              <option value="observation">Observation</option>
+            </select>
+          </div>
+          <div class="field-group"><label>Catégorie</label><input type="text" [(ngModel)]="litForm.categorie" readonly/></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" (click)="showLitModal = false">Annuler</button>
+          <button class="btn-primary" (click)="saveLit()">Ajouter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Export PDF -->
+  <div class="modal-overlay" *ngIf="showExportModal" (click)="showExportModal = false">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Exporter rapport mensuel</h3>
+        <button class="btn-close" (click)="showExportModal = false">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="export-icon-wrap">
+          <ion-icon name="document-text-outline"></ion-icon>
+        </div>
+        <p class="modal-desc">Le rapport PDF inclut les statistiques, la distribution par niveau, la courbe d'affluence journalière et la liste complète des triages du mois.</p>
+        <div class="field-group">
+          <label>Mois à exporter</label>
+          <input type="month" [(ngModel)]="exportMois"/>
+        </div>
+        <div class="modal-actions" style="margin-top:16px">
+          <button class="btn-cancel" (click)="showExportModal = false">Annuler</button>
+          <button class="btn-primary" (click)="genererExportPDF()" [disabled]="exportLoading">
+            <ion-spinner *ngIf="exportLoading" name="crescent"></ion-spinner>
+            <span *ngIf="!exportLoading"><ion-icon name="download-outline"></ion-icon> Générer PDF</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</ion-content>

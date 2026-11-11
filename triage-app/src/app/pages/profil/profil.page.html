@@ -1,0 +1,230 @@
+<ion-header class="profil-header">
+  <ion-toolbar>
+    <div class="toolbar-content">
+      <div class="header-left">
+        <button class="btn-back" (click)="goBack()">
+          <ion-icon name="arrow-back-outline"></ion-icon>
+        </button>
+        <div class="logo-icon-wrap">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </div>
+        <div>
+          <h2>Mon profil</h2>
+          <p>{{ currentUser?.nom_complet }}</p>
+        </div>
+      </div>
+      <button class="btn-logout" (click)="logout()">
+        <ion-icon name="log-out-outline"></ion-icon>
+      </button>
+    </div>
+  </ion-toolbar>
+</ion-header>
+<ion-content class="profil-content">
+  <div class="profil-container">
+
+    <div class="loading-state" *ngIf="profilLoading">
+      <ion-spinner name="crescent"></ion-spinner><p>Chargement...</p>
+    </div>
+
+    <ng-container *ngIf="!profilLoading && profilData">
+      <div class="profil-layout">
+
+        <!-- ═══ RANGÉE 1 : Identité compacte + Infos + QR ═══ -->
+        <div class="profil-top-row">
+
+          <!-- Carte identité compacte -->
+          <div class="identity-card">
+            <div class="identity-avatar">
+              {{ profilData.prenom?.charAt(0) }}{{ profilData.nom?.charAt(0) }}
+            </div>
+            <h3 class="identity-name">{{ profilData.nom_complet }}</h3>
+            <span class="identity-role">
+              {{ profilData.role === 'admin' ? 'Administrateur' : 'Infirmier(ère)' }}
+            </span>
+            <div class="identity-service">
+              <ion-icon name="business-outline"></ion-icon>
+              {{ profilData.service || 'Non assigné' }}
+            </div>
+          </div>
+
+          <!-- Carte infos personnelles -->
+          <div class="details-card">
+            <p class="details-title">
+              <ion-icon name="person-outline"></ion-icon>
+              Informations personnelles
+            </p>
+            <div class="details-grid">
+              <div class="detail-row">
+                <span class="detail-label">Rôle</span>
+                <span class="detail-value">{{ profilData.role === 'admin' ? 'Administrateur' : 'Infirmier' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Service</span>
+                <span class="detail-value">{{ profilData.service || 'Non assigné' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Téléphone</span>
+                <span class="detail-value">{{ profilData.telephone || '—' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">E-mail</span>
+                <span class="detail-value">{{ profilData.email }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Statut</span>
+                <span class="detail-value">{{ profilData.statut | titlecase }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Membre depuis</span>
+                <span class="detail-value">{{ profilData.date_creation | date:'dd/MM/yyyy' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Carte QR compacte -->
+          <div class="qr-card" *ngIf="profilData.qr_code_base64">
+            <span class="qr-label">QR Code</span>
+            <div class="qr-frame">
+              <img [src]="'data:image/png;base64,' + profilData.qr_code_base64"
+                width="110" height="110"/>
+            </div>
+            <p class="qr-hint">Connexion rapide</p>
+          </div>
+
+        </div>
+
+        <!-- ═══ RANGÉE 2 : Casier + Sécurité ═══ -->
+        <div class="profil-mid-row" style="grid-template-columns: 1fr;">
+          <div class="mini-card">
+            <p class="mini-card-title">
+              <ion-icon name="file-tray-outline"></ion-icon>
+              Casier réservé
+            </p>
+            <div class="casier-input-row">
+              <input type="text" [(ngModel)]="numeroCasier" placeholder="Ex: C-12"/>
+              <button class="btn-save-casier" (click)="sauvegarderCasier()">
+                <ion-icon name="checkmark-outline"></ion-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- ═══ RANGÉE 3 : Mon planning ═══ -->
+        <div class="planning-card" *ngIf="monPlanning.length > 0">
+          <div class="planning-card-header">
+            <h4>
+              <ion-icon name="calendar-outline"></ion-icon>
+              Mon emploi du temps — cette semaine
+            </h4>
+          </div>
+
+          <div class="planning-week-grid">
+            <div class="planning-day-col"
+              *ngFor="let jour of ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']; let i = index"
+              [class.today]="isAujourdhui(i)"
+              [class.has-shift]="getPlanningJour(i).length > 0">
+
+              <span class="planning-day-name">{{ jour }}</span>
+              <span class="planning-day-date">{{ getDateSemaine(i) | date:'dd/MM' }}</span>
+
+              <div class="planning-shifts">
+                <ng-container *ngIf="getPlanningJour(i).length > 0; else reposBlock">
+                  <div class="shift-badge" *ngFor="let p of getPlanningJour(i)"
+                    [class.matin]="p.creneau === 'matin'"
+                    [class.aprem]="p.creneau === 'aprem'"
+                    [class.nuit]="p.creneau === 'nuit'">
+                    <ion-icon [name]="creneauIcon(p.creneau)"></ion-icon>
+                    <span>{{ creneauLabel(p.creneau) }}</span>
+                  </div>
+                </ng-container>
+                <ng-template #reposBlock>
+                  <span class="shift-repos">Repos</span>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ RANGÉE 4 : Remarques (infirmiers uniquement) ═══ -->
+        <div class="profil-remarques-card" *ngIf="profilData?.role !== 'admin'">
+          <div class="remarques-header">
+            <h4>
+              <ion-icon name="chatbubbles-outline"></ion-icon>
+              Remarques et réclamations
+            </h4>
+            <button class="btn-new-remarque" (click)="openRemarqueModal()">
+              <ion-icon name="add-outline"></ion-icon> Nouvelle
+            </button>
+          </div>
+
+          <div class="loading-state" *ngIf="remarquesLoading">
+            <ion-spinner name="crescent"></ion-spinner>
+          </div>
+
+          <div class="empty-remarques" *ngIf="!remarquesLoading && mesRemarques.length === 0">
+            <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+            <p>Aucune remarque envoyée</p>
+            <span>Utilisez ce formulaire pour contacter l'administration</span>
+          </div>
+
+          <div class="remarques-list" *ngIf="!remarquesLoading && mesRemarques.length > 0">
+            <div class="remarque-card" *ngFor="let r of mesRemarques"
+              [class.has-reponse]="r.reponse">
+              <div class="remarque-top">
+                <span class="remarque-type-badge"
+                  [class.reclamation]="r.type === 'reclamation'">
+                  {{ r.type === 'reclamation' ? 'Réclamation' : 'Remarque' }}
+                </span>
+                <span class="remarque-date">{{ r.date_creation | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <p class="remarque-sujet" *ngIf="r.sujet">{{ r.sujet }}</p>
+              <p class="remarque-message">{{ r.message }}</p>
+              <div class="remarque-reponse" *ngIf="r.reponse">
+                <ion-icon name="return-down-forward-outline"></ion-icon>
+                <div>
+                  <span class="reponse-label">Réponse de l'administration</span>
+                  <p>{{ r.reponse }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </ng-container>
+  </div>
+</ion-content>
+<!-- ══ MODAL REMARQUE ══ -->
+<div class="modal-overlay" *ngIf="showRemarqueModal" (click)="showRemarqueModal = false">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Nouvelle remarque</h3>
+      <button class="btn-close" (click)="showRemarqueModal = false">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+    <div class="modal-form">
+      <div class="field-group">
+        <label>Type</label>
+        <select [(ngModel)]="remarqueForm.type">
+          <option value="remarque">Remarque</option>
+          <option value="reclamation">Réclamation</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Sujet</label>
+        <input type="text" [(ngModel)]="remarqueForm.sujet" placeholder="Sujet de votre message"/>
+      </div>
+      <div class="field-group">
+        <label>Message *</label>
+        <textarea [(ngModel)]="remarqueForm.message" rows="4" placeholder="Décrivez votre remarque ou réclamation..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="showRemarqueModal = false">Annuler</button>
+        <button class="btn-primary" (click)="envoyerRemarque()" [disabled]="remarqueLoading">
+          <ion-spinner name="crescent" *ngIf="remarqueLoading"></ion-spinner>
+          <span *ngIf="!remarqueLoading"><ion-icon name="send-outline"></ion-icon> Envoyer</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

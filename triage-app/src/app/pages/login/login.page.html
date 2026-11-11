@@ -1,0 +1,121 @@
+<ion-content class="login-content">
+  <div class="login-wrapper">
+    <div class="login-card">
+
+      <div class="login-header">
+        <div class="logo-ring">
+          <ion-icon name="pulse-outline"></ion-icon>
+        </div>
+        <h1>TriagePro</h1>
+        <p>Système de triage médical</p>
+      </div>
+
+      <!-- Onglets -->
+      <div class="tabs">
+        <button [class.active]="activeTab === 'email'" (click)="activeTab = 'email'; stopScanner()">
+          <ion-icon name="mail-outline"></ion-icon> Email
+        </button>
+        <button [class.active]="activeTab === 'qr'" (click)="activeTab = 'qr'">
+          <ion-icon name="qr-code-outline"></ion-icon> QR Code
+        </button>
+      </div>
+
+      <!-- ── Formulaire email ── -->
+      <form *ngIf="activeTab === 'email'" [formGroup]="loginForm" (ngSubmit)="onLogin()" class="login-form">
+        <div class="field-group">
+          <label>Adresse email</label>
+          <div class="input-wrapper" [class.invalid]="isFieldInvalid('email')">
+            <ion-icon name="mail-outline"></ion-icon>
+            <input type="email" formControlName="email" placeholder="prenom.nom@hopital.tn"/>
+          </div>
+          <span class="error-msg" *ngIf="isFieldInvalid('email')">Email invalide</span>
+        </div>
+        <div class="field-group">
+          <label>Mot de passe</label>
+          <div class="input-wrapper" [class.invalid]="isFieldInvalid('password')">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="••••••••"/>
+            <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"
+              class="toggle-pass" (click)="showPassword = !showPassword">
+            </ion-icon>
+          </div>
+          <span class="error-msg" *ngIf="isFieldInvalid('password')">Mot de passe requis</span>
+        </div>
+        <div class="server-error" *ngIf="serverError">
+          <ion-icon name="warning-outline"></ion-icon> {{ serverError }}
+        </div>
+        <button type="submit" class="btn-login" [disabled]="loading">
+          <ion-spinner *ngIf="loading" name="crescent"></ion-spinner>
+          <span *ngIf="!loading"><ion-icon name="log-in-outline"></ion-icon> Se connecter</span>
+        </button>
+      </form>
+
+      <!-- ── Section QR ── -->
+      <div *ngIf="activeTab === 'qr'" class="qr-section">
+
+        <!-- Connexion en cours -->
+        <div *ngIf="loading" class="qr-loading">
+          <ion-spinner name="crescent"></ion-spinner>
+          <p>Connexion en cours...</p>
+        </div>
+
+        <!-- Scanner actif -->
+        <ng-container *ngIf="!loading">
+
+          <!-- Aperçu caméra (caché mais nécessaire pour jsQR) -->
+          <div class="camera-wrap" [class.visible]="scanning">
+            <video #video playsinline muted></video>
+            <canvas #canvas style="display:none"></canvas>
+            <div class="camera-overlay">
+              <div class="corner tl"></div><div class="corner tr"></div>
+              <div class="corner bl"></div><div class="corner br"></div>
+              <div class="scan-line"></div>
+            </div>
+            <p class="scan-live-hint">
+              <ion-icon name="scan-outline"></ion-icon> Pointez vers le QR code...
+            </p>
+          </div>
+
+          <!-- État inactif -->
+          <div class="qr-idle" *ngIf="!scanning">
+            <div class="qr-icon-wrap">
+              <ion-icon name="qr-code-outline"></ion-icon>
+            </div>
+            <p class="qr-hint">Utilisez votre caméra pour scanner votre QR code de connexion</p>
+          </div>
+
+          <div class="server-error" *ngIf="serverError">
+            <ion-icon name="warning-outline"></ion-icon> {{ serverError }}
+          </div>
+
+          <!-- Boutons -->
+          <button class="btn-login" (click)="startQrScanner()" *ngIf="!scanning">
+            <ion-icon name="camera-outline"></ion-icon> Activer la caméra
+          </button>
+          <button class="btn-cancel-scan" (click)="stopScanner()" *ngIf="scanning">
+            <ion-icon name="close-outline"></ion-icon> Arrêter le scan
+          </button>
+
+          <!-- Token manuel (fallback) -->
+          <div class="manual-divider"><span>ou</span></div>
+          <div class="manual-input">
+            <div class="input-wrapper">
+              <ion-icon name="key-outline"></ion-icon>
+              <input type="text" [(ngModel)]="manualToken" placeholder="Coller le token QR manuellement..."/>
+            </div>
+            <button class="btn-manual" (click)="loginWithManualToken()" [disabled]="!manualToken || loading">
+              Valider le token
+            </button>
+          </div>
+
+        </ng-container>
+      </div>
+
+      <div class="login-footer">
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
+        <p>Accès réservé au personnel autorisé</p>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

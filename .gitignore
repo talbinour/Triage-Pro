@@ -1,0 +1,40 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Environnement virtuel
+venv/
+.venv/
+env/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Django
+*.sqlite3
+db.sqlite3
+staticfiles/
+
+# Node.js
+**/node_modules/
+
+# Ionic / Angular
+**/.angular/
+**/www/
+**/dist/
+**/coverage/
+**/.ionic/
+
+# IDE
+.idea/
+.vscode/
+
+# System
+.DS_Store
+Thumbs.db

@@ -1,0 +1,7 @@
+{
+  "name": "triage-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

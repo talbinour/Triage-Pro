@@ -1,0 +1,642 @@
+<ion-header class="triage-header">
+  <ion-toolbar>
+    <div class="toolbar-content">
+      <div class="header-left">
+        <div class="logo-icon-wrap">
+          <ion-icon name="pulse-outline"></ion-icon>
+        </div>
+        <div>
+          <h2>TriagePro</h2>
+          <p>{{ currentUser?.nom_complet }} · Infirmier</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-profil" (click)="goToProfil()">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </button>
+        <button class="btn-logout" (click)="logout()">
+          <ion-icon name="log-out-outline"></ion-icon>
+        </button>
+      </div>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="triage-content">
+  <div class="triage-container">
+
+   <!-- Onglets -->
+    <div class="tabs">
+      <button [class.active]="activeTab === 'formulaire'"
+        (click)="activeTab = 'formulaire'">
+        <ion-icon name="person-add-outline"></ion-icon>
+        Nouveau patient
+      </button>
+      <button [class.active]="activeTab === 'attente'"
+        (click)="activeTab = 'attente'; chargerPatients()">
+        <ion-icon name="hourglass-outline"></ion-icon>
+        File d'attente
+        <span class="badge-count" *ngIf="patientsAttente.length > 0">
+          {{ patientsAttente.length }}
+        </span>
+      </button>
+      <button [class.active]="activeTab === 'consultation'"
+        (click)="activeTab = 'consultation'; chargerPatients()">
+        <ion-icon name="medkit-outline"></ion-icon>
+        En consultation
+        <span class="badge-count" *ngIf="patientsConsultation.length > 0">
+          {{ patientsConsultation.length }}
+        </span>
+      </button>
+    </div>
+
+    <!-- ══ ONGLET FORMULAIRE ══ -->
+    <div *ngIf="activeTab === 'formulaire'" class="tab-content">
+
+      <div class="form-header">
+        <ion-icon name="person-add-outline"></ion-icon>
+        <div>
+          <h3>Nouveau patient</h3>
+          <p>Remplissez les informations pour évaluer l'état d'urgence</p>
+        </div>
+      </div>
+
+      <form [formGroup]="patientForm" (ngSubmit)="onSubmit()">
+
+        <!-- Section Identité -->
+        <div class="form-section">
+          <h4 class="section-label">
+            <ion-icon name="person-outline"></ion-icon>
+            Identité du patient
+          </h4>
+          <div class="form-row">
+            <div class="field-group">
+              <label>Prénom *</label>
+              <input type="text" formControlName="prenom"
+                placeholder="Mohamed" [class.invalid]="isInvalid('prenom')"/>
+              <span class="error-msg" *ngIf="isInvalid('prenom')">Champ requis</span>
+            </div>
+            <div class="field-group">
+              <label>Nom *</label>
+              <input type="text" formControlName="nom"
+                placeholder="Ben Ali" [class.invalid]="isInvalid('nom')"/>
+              <span class="error-msg" *ngIf="isInvalid('nom')">Champ requis</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field-group">
+              <label>Âge *</label>
+              <input type="number" formControlName="age"
+                placeholder="35" [class.invalid]="isInvalid('age')"/>
+              <span class="error-msg" *ngIf="isInvalid('age')">
+                Âge entre 0 et 120
+              </span>
+            </div>
+            <div class="field-group">
+              <label>Sexe *</label>
+              <select formControlName="sexe" [class.invalid]="isInvalid('sexe')">
+                <option value="">-- Choisir --</option>
+                <option value="M">Masculin</option>
+                <option value="F">Féminin</option>
+              </select>
+              <span class="error-msg" *ngIf="isInvalid('sexe')">Champ requis</span>
+            </div>
+          </div>
+        </div>
+
+      <!-- ── Section Constantes vitales ── -->
+      <!-- ── Section Constantes vitales ── -->
+      <div class="form-section">
+        <h4 class="section-label">
+          <ion-icon name="heart-outline"></ion-icon>
+          Constantes vitales
+        </h4>
+ 
+        <!-- ════ BOUTON IMPORT IOT ════ -->
+        <div class="iot-import-bar">
+          <div class="iot-status">
+            <span class="iot-dot" [class.connected]="iotConnected"></span>
+            <span class="iot-label">
+              Bracelet IoT
+              <span *ngIf="iotConnected" class="iot-connected-txt">connecté</span>
+              <span *ngIf="!iotConnected" class="iot-disconnected-txt">non connecté</span>
+            </span>
+          </div>
+          <button type="button" class="btn-iot-import"
+            (click)="importerDepuisIoT()"
+            [disabled]="iotLoading">
+            <ion-spinner name="crescent" *ngIf="iotLoading"
+              style="width:16px;height:16px;margin-right:6px">
+            </ion-spinner>
+            <ion-icon name="watch-outline" *ngIf="!iotLoading"></ion-icon>
+            {{ iotLoading ? 'Lecture en cours...' : 'Importer depuis le bracelet' }}
+          </button>
+        </div>
+ 
+        <!-- Message succès import -->
+        <div class="iot-success-msg" *ngIf="iotImported">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          {{ iotImportedFields }} constantes importées automatiquement
+          <span class="iot-timestamp">· {{ iotLastUpdate }}</span>
+        </div>
+        <!-- ════ FIN BOUTON IOT ════ -->
+ 
+        <div class="form-row three-cols">
+          <div class="field-group">
+            <label>Température (°C) *</label>
+            <div class="input-with-unit">
+              <input type="number" step="0.1" formControlName="temperature"
+                placeholder="37.5" [class.invalid]="isInvalid('temperature')"/>
+              <span class="unit">°C</span>
+            </div>
+            <span class="error-msg" *ngIf="isInvalid('temperature')">
+              Entre 30 et 45°C
+            </span>
+          </div>
+
+          <div class="field-group">
+            <label>Saturation O₂ *</label>
+            <div class="input-with-unit">
+              <input type="number" formControlName="oxygene"
+                placeholder="98" [class.invalid]="isInvalid('oxygene')"/>
+              <span class="unit">%</span>
+            </div>
+            <span class="error-msg" *ngIf="isInvalid('oxygene')">
+              Entre 50 et 100%
+            </span>
+          </div>
+
+          <div class="field-group">
+            <label>Pouls *</label>
+            <div class="input-with-unit">
+              <input type="number" formControlName="pouls"
+                placeholder="80" [class.invalid]="isInvalid('pouls')"/>
+              <span class="unit">bpm</span>
+            </div>
+            <span class="error-msg" *ngIf="isInvalid('pouls')">
+              Entre 20 et 300 bpm
+            </span>
+          </div>
+        </div>
+
+        <div class="form-row three-cols">
+          <div class="field-group">
+            <label>Pression systolique *</label>
+            <div class="input-with-unit">
+              <input type="number" formControlName="sbp"
+                placeholder="120" [class.invalid]="isInvalid('sbp')"/>
+              <span class="unit">mmHg</span>
+            </div>
+            <span class="error-msg" *ngIf="isInvalid('sbp')">Requis</span>
+          </div>
+
+          <div class="field-group">
+            <label>Pression diastolique *</label>
+            <div class="input-with-unit">
+              <input type="number" formControlName="dbp"
+                placeholder="80" [class.invalid]="isInvalid('dbp')"/>
+              <span class="unit">mmHg</span>
+            </div>
+            <span class="error-msg" *ngIf="isInvalid('dbp')">Requis</span>
+          </div>
+
+          <div class="field-group">
+            <label>Fréq. respiratoire *</label>
+            <div class="input-with-unit">
+              <input type="number" formControlName="rr"
+                placeholder="16" [class.invalid]="isInvalid('rr')"/>
+              <span class="unit">rpm</span>
+            </div>
+            <span class="error-msg" *ngIf="isInvalid('rr')">Requis</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section Évaluation clinique ── -->
+      <div class="form-section">
+        <h4 class="section-label">
+          <ion-icon name="medkit-outline"></ion-icon>
+          Évaluation clinique
+        </h4>
+
+        <div class="form-row">
+          <div class="field-group">
+            <label>Mode d'arrivée *</label>
+            <select formControlName="arrival_mode">
+              <option value="1">🚶 Marche seul</option>
+              <option value="2">🚑 Ambulance publique</option>
+              <option value="3">🚗 Véhicule privé</option>
+              <option value="4">🚐 Ambulance privée</option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label>Blessure *</label>
+            <select formControlName="injury">
+              <option value="1">Non</option>
+              <option value="2">Oui</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field-group">
+            <label>État mental *</label>
+            <select formControlName="mental">
+              <option value="1">✅ Alerte — répond normalement</option>
+              <option value="2">🗣️ Verbal — répond à la voix</option>
+              <option value="3">😣 Douleur — répond à la douleur</option>
+              <option value="4">❌ Inconscient — aucune réponse</option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label>Douleur *</label>
+            <select formControlName="pain"
+              (change)="onPainChange()">
+              <option value="0">Non</option>
+              <option value="1">Oui</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Score NRS — visible seulement si douleur = Oui -->
+        <div class="field-group" 
+          *ngIf="patientForm.get('pain')?.value === '1'">
+          <label>
+            Score de douleur NRS 
+            <span class="nrs-value">
+              {{ patientForm.get('nrs_pain')?.value }}/10
+            </span>
+          </label>
+          <div class="nrs-slider-wrap">
+            <input type="range" formControlName="nrs_pain"
+              min="0" max="10" step="1"
+              class="nrs-slider"/>
+            <div class="nrs-labels">
+              <span>0</span>
+              <span>Modérée</span>
+              <span>10</span>
+            </div>
+          </div>
+          <div class="nrs-indicators">
+            <span class="nrs-tag" style="background:#27ae60">0-3 Légère</span>
+            <span class="nrs-tag" style="background:#f1c40f">4-6 Modérée</span>
+            <span class="nrs-tag" style="background:#e67e22">7-8 Intense</span>
+            <span class="nrs-tag" style="background:#c0392b">9-10 Extrême</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section Symptômes ── -->
+      <div class="form-section">
+        <h4 class="section-label">
+          <ion-icon name="clipboard-outline"></ion-icon>
+          Symptômes <span class="optional">(optionnel)</span>
+        </h4>
+        <div class="field-group">
+          <label>Symptôme principal</label>
+          <input type="text" formControlName="symptome1"
+            placeholder="Ex : douleur thoracique intense..."/>
+        </div>
+        <div class="field-group" style="margin-top: 12px">
+          <label>Symptôme secondaire</label>
+          <input type="text" formControlName="symptome2"
+            placeholder="Ex : nausées, vertiges..."/>
+        </div>
+      </div>
+        <!-- Bouton soumettre -->
+        <button type="submit" class="btn-submit" [disabled]="loadingIA">
+          <ion-spinner name="crescent" *ngIf="loadingIA"></ion-spinner>
+          <ion-icon name="pulse-outline" *ngIf="!loadingIA"></ion-icon>
+          {{ loadingIA ? 'Analyse IA en cours...' : 'Évaluer avec l\'IA' }}
+        </button>
+
+      </form>
+    </div>
+
+    <!-- ══ ONGLET FILE D'ATTENTE ══ -->
+    <div *ngIf="activeTab === 'attente'" class="tab-content">
+
+      <div class="liste-header">
+        <div>
+          <h3>File d'attente</h3>
+          <p>{{ patientsAttente.length }} patient(s) en attente</p>
+        </div>
+        <div class="liste-actions">
+          <button class="btn-filtre-depassement"
+            [class.active]="filtreDepassement"
+            (click)="toggleFiltreDepassement()">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            {{ filtreDepassement ? 'Tous' : 'En retard' }}
+          </button>
+          <button class="btn-refresh" (click)="chargerPatients()">
+            <ion-icon name="refresh-outline"></ion-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="loading-state" *ngIf="loadingListe">
+        <ion-spinner name="crescent"></ion-spinner><p>Chargement...</p>
+      </div>
+
+      <div class="empty-state" *ngIf="!loadingListe && patientsAttente.length === 0">
+        <ion-icon name="people-outline"></ion-icon>
+        <p>Aucun patient en attente</p>
+        <span>Les patients apparaîtront ici après leur enregistrement</span>
+      </div>
+
+      <div class="patients-list" *ngIf="!loadingListe && patientsAttente.length > 0">
+        <div class="patient-card" *ngFor="let p of patientsAffiches; let i = index"
+            [class.depassement]="estEnDepassement(p)">
+
+          <div class="urgence-band" [style.background]="couleurUrgence(p.degre_urgence)">
+            <span class="urgence-label">{{ labelUrgence(p.degre_urgence) }}</span>
+            <span class="position-badge">#{{ i + 1 }}</span>
+          </div>
+
+          <div class="patient-body">
+            <div class="patient-top">
+              <div class="patient-identity">
+                <div class="avatar-small" [style.background]="couleurUrgence(p.degre_urgence)">
+                  {{ p.prenom.charAt(0) }}{{ p.nom.charAt(0) }}
+                </div>
+                <div>
+                  <h4>{{ p.prenom }} {{ p.nom }}</h4>
+                  <p>{{ p.age }} ans · {{ p.sexe === 'M' ? 'Masculin' : 'Féminin' }}</p>
+                </div>
+              </div>
+              <div class="countdown-wrap" [class.depasse]="estEnDepassement(p)">
+                <div class="countdown-ring">
+                  <svg viewBox="0 0 36 36">
+                    <circle class="countdown-bg" cx="18" cy="18" r="15.5"
+                      fill="none" stroke="#eef2f3" stroke-width="3"/>
+                    <circle class="countdown-progress" cx="18" cy="18" r="15.5"
+                      fill="none"
+                      [attr.stroke]="countdownColor(p)"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      [attr.stroke-dasharray]="97.4"
+                      [attr.stroke-dashoffset]="97.4 - (97.4 * countdownPourcent(p) / 100)"
+                      transform="rotate(-90 18 18)"/>
+                  </svg>
+                  <span class="countdown-value"
+                    [style.color]="countdownColor(p)"
+                    [style.font-size]="estEnDepassement(p) ? '9px' : '10px'">
+                    {{ countdownDisplay(p) }}
+                  </span>
+                </div>
+                <div class="countdown-info">
+                  <span class="countdown-label" [style.color]="countdownColor(p)">
+                    {{ estEnDepassement(p) ? 'Retard' : 'Restant' }}
+                  </span>
+                  <span class="countdown-max">Max : {{ delaiMaxMinutes(p.degre_urgence) }} min</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="constantes">
+              <div class="constante"><ion-icon name="thermometer-outline"></ion-icon><span>{{ p.temperature }}°C</span></div>
+              <div class="constante"><ion-icon name="water-outline"></ion-icon><span>{{ p.oxygene }}% O₂</span></div>
+              <div class="constante"><ion-icon name="heart-outline"></ion-icon><span>{{ p.pouls }} bpm</span></div>
+            </div>
+
+            <div class="symptomes" *ngIf="p.symptome1">
+              <span class="symptome-tag">{{ p.symptome1 }}</span>
+              <span class="symptome-tag secondary" *ngIf="p.symptome2">{{ p.symptome2 }}</span>
+            </div>
+
+            <div class="patient-footer">
+              <div class="infirmier-info">
+                <ion-icon name="person-outline"></ion-icon>
+                <span>{{ p.infirmier_nom }}</span>
+              </div>
+              <div class="patient-actions">
+                <button class="btn-update" (click)="mettreAJourUrgence(p)">
+                  <ion-icon name="sync-outline"></ion-icon>
+                </button>
+                <button class="btn-prendre-en-charge" (click)="ouvrirChoixLit(p)">
+                  <ion-icon name="bed-outline"></ion-icon> Prendre en charge
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ONGLET EN CONSULTATION ══ -->
+    <div *ngIf="activeTab === 'consultation'" class="tab-content">
+
+      <div class="liste-header">
+        <div>
+          <h3>En consultation</h3>
+          <p>{{ patientsConsultation.length }} patient(s) en cours de consultation</p>
+        </div>
+        <button class="btn-refresh" (click)="chargerPatients()">
+          <ion-icon name="refresh-outline"></ion-icon> Actualiser
+        </button>
+      </div>
+
+      <div class="loading-state" *ngIf="loadingListe">
+        <ion-spinner name="crescent"></ion-spinner><p>Chargement...</p>
+      </div>
+
+      <div class="empty-state" *ngIf="!loadingListe && patientsConsultation.length === 0">
+        <ion-icon name="medkit-outline"></ion-icon>
+        <p>Aucun patient en consultation</p>
+        <span>Prenez en charge un patient depuis la file d'attente</span>
+      </div>
+
+      <div class="patients-list" *ngIf="!loadingListe && patientsConsultation.length > 0">
+        <div class="patient-card en-consultation" *ngFor="let p of patientsConsultation">
+
+          <div class="urgence-band" [style.background]="couleurUrgence(p.degre_urgence)">
+            <span class="urgence-label">{{ labelUrgence(p.degre_urgence) }}</span>
+            <span class="position-badge">
+              <ion-icon name="bed-outline"></ion-icon> {{ p.lit_numero || '—' }}
+            </span>
+          </div>
+
+          <div class="patient-body">
+            <div class="patient-top">
+              <div class="patient-identity">
+                <div class="avatar-small" [style.background]="couleurUrgence(p.degre_urgence)">
+                  {{ p.prenom.charAt(0) }}{{ p.nom.charAt(0) }}
+                </div>
+                <div>
+                  <h4>{{ p.prenom }} {{ p.nom }}</h4>
+                  <p>{{ p.age }} ans · {{ p.sexe === 'M' ? 'Masculin' : 'Féminin' }}</p>
+                </div>
+              </div>
+              <div class="temps-attente">
+                <ion-icon name="time-outline"></ion-icon>
+                {{ tempsAttente(p.date_creation) }}
+              </div>
+            </div>
+
+            <div class="constantes">
+              <div class="constante"><ion-icon name="thermometer-outline"></ion-icon><span>{{ p.temperature }}°C</span></div>
+              <div class="constante"><ion-icon name="water-outline"></ion-icon><span>{{ p.oxygene }}% O₂</span></div>
+              <div class="constante"><ion-icon name="heart-outline"></ion-icon><span>{{ p.pouls }} bpm</span></div>
+            </div>
+
+            <div class="symptomes" *ngIf="p.symptome1">
+              <span class="symptome-tag">{{ p.symptome1 }}</span>
+              <span class="symptome-tag secondary" *ngIf="p.symptome2">{{ p.symptome2 }}</span>
+            </div>
+
+            <div class="patient-footer">
+              <div class="infirmier-info">
+                <ion-icon name="person-outline"></ion-icon>
+                <span>{{ p.infirmier_nom }}</span>
+              </div>
+              <button class="btn-termine" (click)="terminerPatient(p)">
+                <ion-icon name="checkmark-done-outline"></ion-icon> Terminer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</ion-content>
+
+
+<!-- ══════════════════════════════════════
+     POPUP MODALE RÉSULTAT IA
+══════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showModal" (click)="fermerModal()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+
+    <!-- En-tête modal -->
+    <div class="modal-header">
+      <div>
+        <h3>Résultat IA — Triage</h3>
+        <p>{{ patientForm.value.prenom }} {{ patientForm.value.nom }}</p>
+      </div>
+      <button class="btn-close-modal" (click)="fermerModal()">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+
+    <!-- Badge niveau urgence -->
+    <div class="urgence-badge-modal"
+      [style.background]="predictionIA?.couleur">
+      <span class="niveau-big">{{ predictionIA?.niveau }}</span>
+      <span class="label-big">{{ predictionIA?.label }}</span>
+      <span class="confiance-info">
+        Confiance : {{ predictionIA?.confiance }}%
+      </span>
+    </div>
+
+    <!-- Recommandation -->
+    <div class="modal-recommandation">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <p>{{ predictionIA?.recommandation }}</p>
+    </div>
+
+    <!-- Probabilités -->
+    <div class="modal-probas">
+      <p class="probas-title">Distribution des probabilités</p>
+      <div class="proba-row"
+        *ngFor="let k of probKeys(predictionIA?.probabilites || {})">
+        <span class="proba-key">{{ k }}</span>
+        <div class="proba-track">
+          <div class="proba-fill"
+            [style.width]="(predictionIA?.probabilites?.[k] || 0) + '%'"
+            [style.background]="couleurUrgence(+k.replace('P',''))">
+          </div>
+        </div>
+        <span class="proba-val">
+          {{ predictionIA?.probabilites?.[k] | number:'1.0-1' }}%
+        </span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+  <div class="modal-actions">
+    <button class="btn-modal-modifier" (click)="ouvrirModification()">
+      <ion-icon name="create-outline"></ion-icon>
+      Modifier
+    </button>
+    <button class="btn-modal-confirmer"
+      [style.background]="niveauManuel
+        ? couleurUrgence(niveauManuel)
+        : predictionIA?.couleur"
+      (click)="confirmerEtEnregistrer()"
+      [disabled]="loading">
+      <ion-spinner name="crescent" *ngIf="loading"></ion-spinner>
+      <ion-icon name="checkmark-circle-outline" *ngIf="!loading"></ion-icon>
+      {{ loading ? 'Enregistrement...' : 'Confirmer' }}
+    </button>
+  </div>
+
+  <!-- Sélection manuelle du niveau (visible après 'Modifier') -->
+  <div class="correction-manuelle" *ngIf="modificationManuelle">
+    <p class="correction-titre">
+      <ion-icon name="pencil-outline"></ion-icon>
+      Corriger le niveau d'urgence :
+    </p>
+      <div class="niveaux-grid">
+      <button *ngFor="let n of [1,2,3,4,5]"
+        class="btn-niveau"
+        [style.background]="niveauManuel === n
+          ? couleurUrgence(n) : 'white'"
+        [style.color]="niveauManuel === n ? 'white' : '#333'"
+        [style.border-color]="couleurUrgence(n)"
+        (click)="choisirNiveauManuel(n)">
+        <span class="niveau-code"
+          [style.color]="niveauManuel === n
+            ? 'white' : couleurUrgence(n)">
+          P{{ n }}
+        </span>
+        <span class="niveau-mini">{{ labelUrgence(n).split('—')[1]?.trim() }}</span>
+      </button>
+    </div>
+  </div>
+
+  </div>
+</div>
+<!-- ══ MODAL CHOIX DU LIT ══ -->
+<div class="modal-overlay" *ngIf="showLitModal" (click)="fermerLitModal()">
+  <div class="modal-card modal-lits" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3>Choisir un lit</h3>
+        <p *ngIf="patientAPrendre">
+          {{ patientAPrendre.prenom }} {{ patientAPrendre.nom }}
+          — {{ labelUrgence(patientAPrendre.degre_urgence) }}
+        </p>
+      </div>
+      <button class="btn-close-modal" (click)="fermerLitModal()">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+
+    <div class="lit-recommandation" *ngIf="patientAPrendre">
+      <ion-icon name="bulb-outline"></ion-icon>
+      <span>Recommandé : lit de <strong>{{ typeLitRecommande(patientAPrendre) }}</strong></span>
+    </div>
+
+    <div class="loading-state" *ngIf="litsLoading">
+      <ion-spinner name="crescent"></ion-spinner>
+    </div>
+
+    <div class="lits-empty" *ngIf="!litsLoading && litsLibres.length === 0">
+      <ion-icon name="alert-circle-outline"></ion-icon>
+      <p>Aucun lit disponible</p>
+    </div>
+
+    <div class="lits-choice-grid" *ngIf="!litsLoading && litsLibres.length > 0">
+      <button class="lit-choice-card" *ngFor="let lit of litsLibres"
+        [class.recommended]="patientAPrendre && lit.type === typeLitRecommande(patientAPrendre)"
+        (click)="choisirLit(lit)">
+        <span class="lit-choice-numero">{{ lit.numero }}</span>
+        <span class="lit-choice-type">{{ lit.type }}</span>
+        <span class="lit-choice-cat">{{ lit.categorie }}</span>
+      </button>
+    </div>
+  </div>
+</div>
